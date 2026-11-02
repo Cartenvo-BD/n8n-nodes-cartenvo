@@ -1,0 +1,21 @@
+{
+  "name": "nopCommerce: new order → Slack message",
+  "nodes": [
+    {
+      "id": "e2a1", "name": "Order placed", "type": "n8n-nodes-cartenvo.cartenvoTrigger", "typeVersion": 1, "position": [0, 0],
+      "webhookId": "2a7d2b63-9e1f-4054-8b48-3c4d5e6f7081",
+      "parameters": { "events": ["order.placed"], "format": "full", "options": {} }
+    },
+    {
+      "id": "e2a2", "name": "Post to #orders", "type": "n8n-nodes-base.slack", "typeVersion": 2.7, "position": [260, 0],
+      "parameters": {
+        "select": "channel",
+        "channelId": { "__rl": true, "mode": "name", "value": "#orders" },
+        "text": "=New order {{ $json.data.number }}: {{ $json.data.totals.total }} {{ $json.data.currency }} from {{ $json.data.customer.firstName }} {{ $json.data.customer.lastName }} ({{ $json.data.items.length }} items). {{ $json.data.adminUrl }}",
+        "otherOptions": {}
+      }
+    }
+  ],
+  "connections": { "Order placed": { "main": [[{ "node": "Post to #orders", "type": "main", "index": 0 }]] } },
+  "settings": { "executionOrder": "v1" }
+}

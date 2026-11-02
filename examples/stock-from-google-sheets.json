@@ -1,0 +1,33 @@
+{
+  "name": "nopCommerce: stock from Google Sheets every hour",
+  "nodes": [
+    {
+      "id": "e3a1", "name": "Every hour", "type": "n8n-nodes-base.scheduleTrigger", "typeVersion": 1.2, "position": [0, 0],
+      "parameters": { "rule": { "interval": [{ "field": "hours" }] } }
+    },
+    {
+      "id": "e3a2", "name": "Read stock sheet", "type": "n8n-nodes-base.googleSheets", "typeVersion": 4.7, "position": [240, 0],
+      "notes": "Columns: SKU, Quantity",
+      "parameters": {
+        "documentId": { "__rl": true, "mode": "url", "value": "" },
+        "sheetName": { "__rl": true, "mode": "list", "value": "gid=0", "cachedResultName": "Sheet1" },
+        "options": {}
+      }
+    },
+    {
+      "id": "e3a3", "name": "Set stock", "type": "n8n-nodes-cartenvo.cartenvo", "typeVersion": 1, "position": [480, 0],
+      "onError": "continueRegularOutput",
+      "notes": "Turn Dry Run off once the output looks right.",
+      "parameters": {
+        "resource": "product", "operation": "updateStock", "identifyBy": "sku",
+        "sku": "={{ $json.SKU }}", "stockMode": "set", "quantity": "={{ Number($json.Quantity) }}",
+        "reason": "Stock sheet", "dryRun": true
+      }
+    }
+  ],
+  "connections": {
+    "Every hour": { "main": [[{ "node": "Read stock sheet", "type": "main", "index": 0 }]] },
+    "Read stock sheet": { "main": [[{ "node": "Set stock", "type": "main", "index": 0 }]] }
+  },
+  "settings": { "executionOrder": "v1" }
+}

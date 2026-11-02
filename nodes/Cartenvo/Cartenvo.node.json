@@ -1,0 +1,15 @@
+{
+	"node": "n8n-nodes-cartenvo.cartenvo",
+	"nodeVersion": "1.0",
+	"codexVersion": "1.0",
+	"categories": ["Sales"],
+	"alias": ["nopCommerce", "nop", "ecommerce", "orders", "stock", "inventory", "webhook"],
+	"resources": {
+		"credentialDocumentation": [
+			{ "url": "https://github.com/Cartenvo-BD/n8n-nodes-cartenvo#credentials" }
+		],
+		"primaryDocumentation": [
+			{ "url": "https://github.com/Cartenvo-BD/n8n-nodes-cartenvo#readme" }
+		]
+	}
+}

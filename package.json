@@ -1,0 +1,60 @@
+{
+	"name": "n8n-nodes-cartenvo",
+	"version": "0.1.0",
+	"description": "n8n nodes for nopCommerce stores running the free Cartenvo Integration Hub plugin: start workflows from store events, and read orders, add shipments and set stock and prices.",
+	"license": "MIT",
+	"homepage": "https://github.com/Cartenvo-BD/n8n-nodes-cartenvo#readme",
+	"keywords": [
+		"n8n-community-node-package",
+		"nopcommerce",
+		"cartenvo",
+		"ecommerce",
+		"webhooks"
+	],
+	"author": {
+		"name": "Cartenvo",
+		"email": "mihonmahmud@gmail.com"
+	},
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/Cartenvo-BD/n8n-nodes-cartenvo.git"
+	},
+	"bugs": {
+		"url": "https://github.com/Cartenvo-BD/n8n-nodes-cartenvo/issues"
+	},
+	"scripts": {
+		"build": "n8n-node build",
+		"build:watch": "tsc --watch",
+		"dev": "n8n-node dev",
+		"lint": "n8n-node lint",
+		"lint:fix": "n8n-node lint --fix",
+		"release": "n8n-node release",
+		"prepublishOnly": "n8n-node prerelease"
+	},
+	"files": [
+		"dist",
+		"!dist/tsconfig.tsbuildinfo",
+		"!dist/**/*.map"
+	],
+	"n8n": {
+		"n8nNodesApiVersion": 1,
+		"strict": true,
+		"credentials": [
+			"dist/credentials/CartenvoApi.credentials.js"
+		],
+		"nodes": [
+			"dist/nodes/Cartenvo/Cartenvo.node.js",
+			"dist/nodes/CartenvoTrigger/CartenvoTrigger.node.js"
+		]
+	},
+	"devDependencies": {
+		"@n8n/node-cli": "0.54.6",
+		"eslint": "9.32.0",
+		"prettier": "3.6.2",
+		"release-it": "^21.1.0",
+		"typescript": "5.9.2"
+	},
+	"peerDependencies": {
+		"n8n-workflow": "*"
+	}
+}

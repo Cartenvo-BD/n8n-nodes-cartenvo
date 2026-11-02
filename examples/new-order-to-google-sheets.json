@@ -1,0 +1,42 @@
+{
+  "name": "nopCommerce: paid order → Google Sheets row",
+  "nodes": [
+    {
+      "id": "e1a1", "name": "Order paid", "type": "n8n-nodes-cartenvo.cartenvoTrigger", "typeVersion": 1, "position": [0, 0],
+      "webhookId": "1f6c1a52-8d0e-4f43-9a37-2b3c4d5e6f70",
+      "parameters": { "events": ["order.paid"], "format": "full", "options": {} }
+    },
+    {
+      "id": "e1a2", "name": "Add row", "type": "n8n-nodes-base.googleSheets", "typeVersion": 4.7, "position": [260, 0],
+      "parameters": {
+        "operation": "append",
+        "documentId": { "__rl": true, "mode": "url", "value": "" },
+        "sheetName": { "__rl": true, "mode": "list", "value": "gid=0", "cachedResultName": "Sheet1" },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Order": "={{ $json.data.number }}",
+            "Date": "={{ $json.data.createdOnUtc }}",
+            "Customer": "={{ $json.data.customer.firstName }} {{ $json.data.customer.lastName }}",
+            "Email": "={{ $json.data.customer.email }}",
+            "Total": "={{ $json.data.totals.total }}",
+            "Currency": "={{ $json.data.currency }}",
+            "Items": "={{ $json.data.items.map(i => i.quantity + ' x ' + i.sku).join(', ') }}"
+          },
+          "schema": [
+            { "id": "Order", "displayName": "Order", "type": "string", "canBeUsedToMatch": true },
+            { "id": "Date", "displayName": "Date", "type": "string", "canBeUsedToMatch": true },
+            { "id": "Customer", "displayName": "Customer", "type": "string", "canBeUsedToMatch": true },
+            { "id": "Email", "displayName": "Email", "type": "string", "canBeUsedToMatch": true },
+            { "id": "Total", "displayName": "Total", "type": "string", "canBeUsedToMatch": true },
+            { "id": "Currency", "displayName": "Currency", "type": "string", "canBeUsedToMatch": true },
+            { "id": "Items", "displayName": "Items", "type": "string", "canBeUsedToMatch": true }
+          ]
+        },
+        "options": {}
+      }
+    }
+  ],
+  "connections": { "Order paid": { "main": [[{ "node": "Add row", "type": "main", "index": 0 }]] } },
+  "settings": { "executionOrder": "v1" }
+}
