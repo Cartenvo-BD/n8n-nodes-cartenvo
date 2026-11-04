@@ -9,6 +9,7 @@ import type {
 import { NodeApiError, NodeConnectionTypes, NodeOperationError } from 'n8n-workflow';
 
 import { hubRequest, MAX_LINES, MAX_LIST } from '../../shared/transport';
+import { customerFields, customerOperations } from './CustomerDescription';
 import { orderFields, orderOperations } from './OrderDescription';
 import { productFields, productOperations } from './ProductDescription';
 
@@ -21,7 +22,7 @@ export class Cartenvo implements INodeType {
 		version: 1,
 		subtitle: '={{$parameter["operation"] + ": " + $parameter["resource"]}}',
 		description:
-			'Read orders, change their status, add shipments, and set stock and prices in a nopCommerce store',
+			'Read orders and customers, change order status, add shipments, set stock and prices, and update customer roles in a nopCommerce store',
 		defaults: {
 			name: 'Cartenvo Integration Hub',
 		},
@@ -41,11 +42,14 @@ export class Cartenvo implements INodeType {
 				type: 'options',
 				noDataExpression: true,
 				options: [
+					{ name: 'Customer', value: 'customer' },
 					{ name: 'Order', value: 'order' },
 					{ name: 'Product', value: 'product' },
 				],
 				default: 'order',
 			},
+			...customerOperations,
+			...customerFields,
 			...orderOperations,
 			...orderFields,
 			...productOperations,
@@ -67,7 +71,9 @@ export class Cartenvo implements INodeType {
 				const results =
 					resource === 'product'
 						? [await setReference.call(this, 'products', this.getNodeParameter('referenceProductId', i) as number, i)]
-						: await orderOperation.call(this, operation, i);
+						: resource === 'customer'
+							? await customerOperation.call(this, operation, i)
+							: await orderOperation.call(this, operation, i);
 				output.push(...results.map((json) => ({ json, pairedItem: { item: i } })));
 			} catch (error) {
 				if (this.continueOnFail()) {
@@ -102,25 +108,8 @@ async function orderOperation(
 		return [await hubRequest.call(this, 'GET', `/orders/${orderId}`)];
 	}
 
-	if (operation === 'getAll') {
-		const returnAll = this.getNodeParameter('returnAll', i) as boolean;
-		const limit = returnAll ? Infinity : (this.getNodeParameter('limit', i) as number);
-		const filters = this.getNodeParameter('filters', i, {}) as IDataObject;
-		const newest = this.getNodeParameter('sort', i, 'oldest') === 'newest';
-		const orders: IDataObject[] = [];
-		let next: number | undefined;
-		do {
-			const page = await hubRequest.call(this, 'GET', '/orders', undefined, {
-				...filters,
-				sort: newest ? 'newest' : undefined,
-				[newest ? 'beforeId' : 'afterId']: next,
-				limit: Math.min(MAX_LIST, limit - orders.length),
-			});
-			orders.push(...((page.items as IDataObject[]) ?? []));
-			next = ((newest ? page.nextBeforeId : page.nextAfterId) as number | null) ?? undefined;
-		} while (next !== undefined && orders.length < limit);
-		return orders;
-	}
+	if (operation === 'getAll')
+		return await getMany.call(this, '/orders', this.getNodeParameter('filters', i, {}) as IDataObject, i);
 
 	if (operation === 'addNote') {
 		const orderId = this.getNodeParameter('orderId', i) as number;
@@ -207,10 +196,82 @@ async function orderOperation(
 	throw new NodeOperationError(this.getNode(), `The operation "${operation}" isn't known.`);
 }
 
+/** A list, page after page, oldest or newest first, up to the node's limit. */
+async function getMany(
+	this: IExecuteFunctions,
+	path: string,
+	filters: IDataObject,
+	i: number,
+): Promise<IDataObject[]> {
+	const returnAll = this.getNodeParameter('returnAll', i) as boolean;
+	const limit = returnAll ? Infinity : (this.getNodeParameter('limit', i) as number);
+	const newest = this.getNodeParameter('sort', i, 'oldest') === 'newest';
+	const items: IDataObject[] = [];
+	let next: number | undefined;
+	do {
+		const page = await hubRequest.call(this, 'GET', path, undefined, {
+			...filters,
+			sort: newest ? 'newest' : undefined,
+			[newest ? 'beforeId' : 'afterId']: next,
+			limit: Math.min(MAX_LIST, limit - items.length),
+		});
+		items.push(...((page.items as IDataObject[]) ?? []));
+		next = ((newest ? page.nextBeforeId : page.nextAfterId) as number | null) ?? undefined;
+	} while (next !== undefined && items.length < limit);
+	return items;
+}
+
+async function customerOperation(
+	this: IExecuteFunctions,
+	operation: string,
+	i: number,
+): Promise<IDataObject[]> {
+	if (operation === 'get') {
+		const customerId = this.getNodeParameter('customerId', i) as number;
+		return [await hubRequest.call(this, 'GET', `/customers/${customerId}`)];
+	}
+
+	if (operation === 'getAll')
+		return await getMany.call(this, '/customers', this.getNodeParameter('customerFilters', i, {}) as IDataObject, i);
+
+	if (operation === 'setExternalReference')
+		return [await setReference.call(this, 'customers', this.getNodeParameter('customerId', i) as number, i)];
+
+	if (operation === 'updateRoles') {
+		const customerId = this.getNodeParameter('customerId', i) as number;
+		const add = roleList(this.getNodeParameter('addRoles', i, '') as string);
+		const remove = roleList(this.getNodeParameter('removeRoles', i, '') as string);
+		if (add.length === 0 && remove.length === 0)
+			throw new NodeOperationError(this.getNode(), 'Give the roles to add, to remove, or both.', {
+				itemIndex: i,
+			});
+		return [
+			await hubRequest.call(
+				this,
+				'POST',
+				`/customers/${customerId}/roles`,
+				{ add, remove, dryRun: this.getNodeParameter('rolesDryRun', i, false) as boolean },
+				undefined,
+				idempotencyKey.call(this, i),
+			),
+		];
+	}
+
+	throw new NodeOperationError(this.getNode(), `The operation "${operation}" isn't known.`);
+}
+
+/** "Wholesale, Gold" → ["Wholesale", "Gold"]. */
+function roleList(text: string): string[] {
+	return text
+		.split(',')
+		.map((role) => role.trim())
+		.filter((role) => role.length > 0);
+}
+
 /** Sets (or, with an empty reference, removes) the link to another system. Answers with all the entity's links. */
 async function setReference(
 	this: IExecuteFunctions,
-	kind: 'orders' | 'products',
+	kind: 'orders' | 'products' | 'customers',
 	id: number,
 	i: number,
 ): Promise<IDataObject> {

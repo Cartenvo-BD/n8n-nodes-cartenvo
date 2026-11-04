@@ -37,6 +37,8 @@ marketplace).
    | The trigger | `webhooks:manage` |
    | Get and Get Many orders | `orders:read` |
    | Update Status, Add Shipment, Add Note | `orders:write` |
+   | Get and Get Many customers | `customers:read` |
+   | Update Roles (needs Integration Hub Pro) | `customers:write` |
    | Set External Reference | `references:write` |
    | Update Stock | `stock:write` |
    | Update Price | `prices:write` |
@@ -86,6 +88,10 @@ address.
 | Order | **Add Shipment** | Some items (by SKU or order item) or everything left, with a tracking number, shipped and delivered at once if you like |
 | Order | **Add Note** | A note on the order, for staff, or shown to the customer and emailed to them |
 | Order | **Set External Reference** | The order's number in another system (such as `odoo` → `SO0042`), found again with Get Many; empty removes it |
+| Customer | **Get** | One registered customer with their roles, addresses and external references |
+| Customer | **Get Many** | Registered customers oldest or newest first, by email, date or an ERP number |
+| Customer | **Set External Reference** | The customer's number in another system; empty removes it |
+| Customer | **Update Roles** | Add and remove customer roles, such as a price group, with a dry run. Needs [Integration Hub Pro](https://cartenvo.com/plugins/integration-hub-pro) in the store |
 | Product | **Update Stock** | Set or adjust stock by SKU or product ID, per warehouse and attribute combination, kept in stock history |
 | Product | **Update Price** | Set price, old price and cost by SKU or product ID |
 | Product | **Set External Reference** | The product's code in another system; empty removes it |
@@ -97,6 +103,9 @@ address.
 - Writes carry an idempotency key, so n8n's **Retry On Fail** doesn't apply a change twice.
 - With **On Error: Continue**, failed lines and orders come out as items with `error` instead of stopping the
   workflow.
+- **Update Roles** names roles by system name or name, as in **Customers → Customer roles**. System roles and roles
+  that may open the admin area can't be changed from n8n. Without Pro in the store the call is refused; the node itself
+  is free and checks no licence.
 
 ## Example workflows
 
@@ -110,7 +119,8 @@ The [`examples/`](examples/) folder has workflows to import (**Workflows → Imp
 ## Compatibility
 
 - Tested with n8n 2.45.
-- The Integration Hub plugin release 2 or later (it adds the API these nodes use).
+- The Integration Hub plugin release 2 or later (it adds the API these nodes use). Get Many's order number filter
+  and newest-first sort need release 5; Update Roles needs release 6 and Integration Hub Pro release 4.
 - nopCommerce 4.80, 4.90 and 5.00.
 
 ## Resources

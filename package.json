@@ -1,7 +1,7 @@
 {
 	"name": "n8n-nodes-cartenvo",
-	"version": "0.1.0",
-	"description": "n8n nodes for nopCommerce stores running the free Cartenvo Integration Hub plugin: start workflows from store events, and read orders, add shipments and set stock and prices.",
+	"version": "0.2.0",
+	"description": "n8n nodes for nopCommerce stores running the free Cartenvo Integration Hub plugin: start workflows from store events, read orders and customers, add shipments, set stock and prices, and update customer roles.",
 	"license": "MIT",
 	"homepage": "https://github.com/Cartenvo-BD/n8n-nodes-cartenvo#readme",
 	"keywords": [
