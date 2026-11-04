@@ -1,0 +1,90 @@
+{
+  "name": "nopCommerce: new customer → Mailchimp subscriber",
+  "meta": {
+    "templateCredsSetupCompleted": false,
+    "description": "Adds each new nopCommerce customer to a Mailchimp audience, with double opt-in."
+  },
+  "nodes": [
+    {
+      "id": "28c45b3d-8d58-4890-a674-5a8c1240ea54",
+      "name": "Setup",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -460,
+        -80
+      ],
+      "parameters": {
+        "content": "## New customer → Mailchimp\n\n1. **New customer:** choose your Cartenvo Integration Hub credential (scope `webhooks:manage`).\n2. **Add subscriber:** choose your Mailchimp credential and the audience (list).\n3. Activate.\n\nThe status is **pending**: Mailchimp emails the customer to confirm, so only people who agree are subscribed. To add only people who ticked the store's newsletter box, change the event to `newsletter.subscribed` and the email to `{{ $json.data.email }}` (the same field).",
+        "height": 340,
+        "width": 420
+      }
+    },
+    {
+      "id": "6e06fea1-fa2d-42ee-a5c4-4f523d6cde0b",
+      "name": "New customer",
+      "type": "n8n-nodes-cartenvo.cartenvoTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {
+        "events": [
+          "customer.registered"
+        ],
+        "format": "full",
+        "options": {}
+      },
+      "webhookId": "6557330b-300a-43d0-a3ef-a8219cd866e2"
+    },
+    {
+      "id": "4795b6f7-e249-4926-a488-d4eca294a0f9",
+      "name": "Add subscriber",
+      "type": "n8n-nodes-base.mailchimp",
+      "typeVersion": 1,
+      "position": [
+        260,
+        0
+      ],
+      "parameters": {
+        "list": "",
+        "email": "={{ $json.data.email }}",
+        "status": "pending",
+        "options": {
+          "tags": "nopCommerce"
+        },
+        "mergeFieldsUi": {
+          "mergeFieldsValues": [
+            {
+              "name": "FNAME",
+              "value": "={{ $json.data.firstName || \"\" }}"
+            },
+            {
+              "name": "LNAME",
+              "value": "={{ $json.data.lastName || \"\" }}"
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "connections": {
+    "New customer": {
+      "main": [
+        [
+          {
+            "node": "Add subscriber",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "tags": []
+}

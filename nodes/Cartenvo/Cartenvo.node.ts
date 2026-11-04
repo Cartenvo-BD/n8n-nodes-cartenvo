@@ -57,13 +57,17 @@ export class Cartenvo implements INodeType {
 		const resource = this.getNodeParameter('resource', 0) as string;
 		const operation = this.getNodeParameter('operation', 0) as string;
 
-		if (resource === 'product') return [await bulkWrite.call(this, operation)];
+		if (resource === 'product' && operation !== 'setExternalReference')
+			return [await bulkWrite.call(this, operation)];
 
 		const items = this.getInputData();
 		const output: INodeExecutionData[] = [];
 		for (let i = 0; i < items.length; i++) {
 			try {
-				const results = await orderOperation.call(this, operation, i);
+				const results =
+					resource === 'product'
+						? [await setReference.call(this, 'products', this.getNodeParameter('referenceProductId', i) as number, i)]
+						: await orderOperation.call(this, operation, i);
 				output.push(...results.map((json) => ({ json, pairedItem: { item: i } })));
 			} catch (error) {
 				if (this.continueOnFail()) {
@@ -102,19 +106,40 @@ async function orderOperation(
 		const returnAll = this.getNodeParameter('returnAll', i) as boolean;
 		const limit = returnAll ? Infinity : (this.getNodeParameter('limit', i) as number);
 		const filters = this.getNodeParameter('filters', i, {}) as IDataObject;
+		const newest = this.getNodeParameter('sort', i, 'oldest') === 'newest';
 		const orders: IDataObject[] = [];
-		let afterId: number | undefined;
+		let next: number | undefined;
 		do {
 			const page = await hubRequest.call(this, 'GET', '/orders', undefined, {
 				...filters,
-				afterId,
+				sort: newest ? 'newest' : undefined,
+				[newest ? 'beforeId' : 'afterId']: next,
 				limit: Math.min(MAX_LIST, limit - orders.length),
 			});
 			orders.push(...((page.items as IDataObject[]) ?? []));
-			afterId = (page.nextAfterId as number | null) ?? undefined;
-		} while (afterId !== undefined && orders.length < limit);
+			next = ((newest ? page.nextBeforeId : page.nextAfterId) as number | null) ?? undefined;
+		} while (next !== undefined && orders.length < limit);
 		return orders;
 	}
+
+	if (operation === 'addNote') {
+		const orderId = this.getNodeParameter('orderId', i) as number;
+		const note = (this.getNodeParameter('note', i) as string).trim();
+		if (!note) throw new NodeOperationError(this.getNode(), 'The note is empty.', { itemIndex: i });
+		return [
+			await hubRequest.call(
+				this,
+				'POST',
+				`/orders/${orderId}/notes`,
+				{ note, displayToCustomer: this.getNodeParameter('displayToCustomer', i) as boolean },
+				undefined,
+				idempotencyKey.call(this, i),
+			),
+		];
+	}
+
+	if (operation === 'setExternalReference')
+		return [await setReference.call(this, 'orders', this.getNodeParameter('orderId', i) as number, i)];
 
 	if (operation === 'updateStatus') {
 		const orderId = this.getNodeParameter('orderId', i) as number;
@@ -180,6 +205,24 @@ async function orderOperation(
 	}
 
 	throw new NodeOperationError(this.getNode(), `The operation "${operation}" isn't known.`);
+}
+
+/** Sets (or, with an empty reference, removes) the link to another system. Answers with all the entity's links. */
+async function setReference(
+	this: IExecuteFunctions,
+	kind: 'orders' | 'products',
+	id: number,
+	i: number,
+): Promise<IDataObject> {
+	const system = (this.getNodeParameter('externalSystem', i) as string).trim().toLowerCase();
+	const reference = (this.getNodeParameter('externalReference', i, '') as string).trim();
+	if (!system)
+		throw new NodeOperationError(this.getNode(), 'The external system is empty.', { itemIndex: i });
+	const path = `/${kind}/${id}/external-references/${encodeURIComponent(system)}`;
+	const references = reference
+		? await hubRequest.call(this, 'PUT', path, { reference }, undefined, idempotencyKey.call(this, i))
+		: await hubRequest.call(this, 'DELETE', path, undefined, undefined, idempotencyKey.call(this, i));
+	return { id, system, reference: reference || null, externalReferences: references };
 }
 
 /**

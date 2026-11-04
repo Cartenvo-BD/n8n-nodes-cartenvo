@@ -12,6 +12,12 @@ export const productOperations: INodeProperties[] = [
 		displayOptions: { show: { resource: ['product'] } },
 		options: [
 			{
+				name: 'Set External Reference',
+				value: 'setExternalReference',
+				description: 'Link a product to its code in another system, such as an ERP',
+				action: 'Set a product external reference',
+			},
+			{
 				name: 'Update Price',
 				value: 'updatePrice',
 				description: 'Set prices by SKU. Each input item is one line; up to 1,000 go in one call.',
@@ -30,6 +36,34 @@ export const productOperations: INodeProperties[] = [
 ];
 
 export const productFields: INodeProperties[] = [
+	{
+		displayName: 'Product ID',
+		name: 'referenceProductId',
+		type: 'number',
+		required: true,
+		default: 0,
+		typeOptions: { minValue: 1 },
+		displayOptions: forProduct(['setExternalReference']),
+	},
+	{
+		displayName: 'External System',
+		name: 'externalSystem',
+		type: 'string',
+		required: true,
+		default: '',
+		placeholder: 'odoo',
+		displayOptions: { show: { resource: ['product'], operation: ['setExternalReference'] } },
+		description:
+			'A short name for the other system: lower-case letters, digits, dots, dashes and underscores, such as odoo or sap-b1',
+	},
+	{
+		displayName: 'External Reference',
+		name: 'externalReference',
+		type: 'string',
+		default: '',
+		displayOptions: { show: { resource: ['product'], operation: ['setExternalReference'] } },
+		description: 'The product’s number in that system, such as SO0042. Leave empty to remove the link.',
+	},
 	{
 		displayName: 'Find Product By',
 		name: 'identifyBy',

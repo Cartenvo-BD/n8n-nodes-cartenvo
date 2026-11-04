@@ -11,6 +11,12 @@ export const orderOperations: INodeProperties[] = [
 		displayOptions: { show: { resource: ['order'] } },
 		options: [
 			{
+				name: 'Add Note',
+				value: 'addNote',
+				description: 'Add a note to an order, for staff or shown to the customer',
+				action: 'Add a note to an order',
+			},
+			{
 				name: 'Add Shipment',
 				value: 'addShipment',
 				description: 'Ship some or all of an order’s items, with a tracking number',
@@ -25,8 +31,14 @@ export const orderOperations: INodeProperties[] = [
 			{
 				name: 'Get Many',
 				value: 'getAll',
-				description: 'Get orders, oldest first, by status or date',
+				description: 'Get orders by number, status or date, oldest or newest first',
 				action: 'Get many orders',
+			},
+			{
+				name: 'Set External Reference',
+				value: 'setExternalReference',
+				description: 'Link an order to its number in another system, such as an ERP',
+				action: 'Set an order external reference',
 			},
 			{
 				name: 'Update Status',
@@ -47,7 +59,7 @@ export const orderFields: INodeProperties[] = [
 		required: true,
 		default: 0,
 		typeOptions: { minValue: 1 },
-		displayOptions: forOrder(['get', 'updateStatus', 'addShipment']),
+		displayOptions: forOrder(['get', 'updateStatus', 'addShipment', 'addNote', 'setExternalReference']),
 		description:
 			'The nopCommerce order ID (the number in the admin URL), not the custom order number',
 	},
@@ -69,6 +81,17 @@ export const orderFields: INodeProperties[] = [
 		typeOptions: { minValue: 1 },
 		displayOptions: { show: { resource: ['order'], operation: ['getAll'], returnAll: [false] } },
 		description: 'Max number of results to return',
+	},
+	{
+		displayName: 'Sort',
+		name: 'sort',
+		type: 'options',
+		options: [
+			{ name: 'Oldest First', value: 'oldest' },
+			{ name: 'Newest First', value: 'newest' },
+		],
+		default: 'oldest',
+		displayOptions: forOrder(['getAll']),
 	},
 	{
 		displayName: 'Filters',
@@ -99,6 +122,13 @@ export const orderFields: INodeProperties[] = [
 				default: '',
 				placeholder: 'odoo',
 				description: 'Find the order by its number in another system',
+			},
+			{
+				displayName: 'Order Number',
+				name: 'number',
+				type: 'string',
+				default: '',
+				description: 'The number the customer sees (the custom order number), not the ID',
 			},
 			{
 				displayName: 'Order Status',
@@ -146,6 +176,46 @@ export const orderFields: INodeProperties[] = [
 				default: 'NotYetShipped',
 			},
 		],
+	},
+
+	// Add note
+	{
+		displayName: 'Note',
+		name: 'note',
+		type: 'string',
+		required: true,
+		default: '',
+		typeOptions: { rows: 3 },
+		displayOptions: forOrder(['addNote']),
+	},
+	{
+		displayName: 'Show to Customer',
+		name: 'displayToCustomer',
+		type: 'boolean',
+		default: false,
+		displayOptions: forOrder(['addNote']),
+		description: 'Whether to show the note on the customer’s order page and email it to them',
+	},
+
+	// External reference
+	{
+		displayName: 'External System',
+		name: 'externalSystem',
+		type: 'string',
+		required: true,
+		default: '',
+		placeholder: 'odoo',
+		displayOptions: { show: { resource: ['order'], operation: ['setExternalReference'] } },
+		description:
+			'A short name for the other system: lower-case letters, digits, dots, dashes and underscores, such as odoo or sap-b1',
+	},
+	{
+		displayName: 'External Reference',
+		name: 'externalReference',
+		type: 'string',
+		default: '',
+		displayOptions: { show: { resource: ['order'], operation: ['setExternalReference'] } },
+		description: 'The order’s number in that system, such as SO0042. Leave empty to remove the link.',
 	},
 
 	// Update status

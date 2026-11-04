@@ -1,0 +1,197 @@
+{
+  "name": "nopCommerce: new order → QuickBooks Online invoice",
+  "meta": {
+    "templateCredsSetupCompleted": false,
+    "description": "Creates a QuickBooks Online invoice for each new nopCommerce order, and the customer when they are new."
+  },
+  "nodes": [
+    {
+      "id": "9768702e-1b18-4906-a869-007efc210584",
+      "name": "Setup",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -460,
+        -80
+      ],
+      "parameters": {
+        "content": "## New order → QuickBooks invoice\n\n1. **New order:** choose your Cartenvo Integration Hub credential (key scopes `webhooks:manage`).\n2. **QuickBooks nodes:** choose your QuickBooks Online credential.\n3. **Create invoice:** replace `1` in the Line expression with the ID of the QuickBooks product or service to book sales to (Sales → Products and services). Shipping uses QuickBooks' `SHIPPING_ITEM_ID`, which needs shipping turned on in QuickBooks settings.\n4. Activate. To invoice only paid orders, change the event to `order.paid`.\n\nAmounts are in the store's primary currency, excluding tax. Set up sales tax in QuickBooks.",
+        "height": 360,
+        "width": 420
+      }
+    },
+    {
+      "id": "728d5271-c1ad-4176-a9fa-0923f7b01152",
+      "name": "New order",
+      "type": "n8n-nodes-cartenvo.cartenvoTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {
+        "events": [
+          "order.placed"
+        ],
+        "format": "full",
+        "options": {}
+      },
+      "webhookId": "fa713ec0-50df-479a-adc6-1474857bc57b"
+    },
+    {
+      "id": "d093377a-b8f7-433e-adf3-9fd36bff6dec",
+      "name": "Find customer",
+      "type": "n8n-nodes-base.quickbooks",
+      "typeVersion": 1,
+      "position": [
+        240,
+        0
+      ],
+      "alwaysOutputData": true,
+      "parameters": {
+        "resource": "customer",
+        "operation": "getAll",
+        "limit": 1,
+        "filters": {
+          "query": "=WHERE PrimaryEmailAddr = '{{ $json.data.customer.email.replace(/'/g, \"\\\\'\") }}'"
+        }
+      }
+    },
+    {
+      "id": "e66b54a0-8ec5-4327-a6ce-b65c9b9885d7",
+      "name": "Customer exists?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        480,
+        0
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "8139689c-a275-484b-a136-48b6341695cf",
+              "leftValue": "={{ $json.Id }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "exists",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "80e89741-310f-4858-adb6-5c7341b9b69d",
+      "name": "Create customer",
+      "type": "n8n-nodes-base.quickbooks",
+      "typeVersion": 1,
+      "position": [
+        720,
+        120
+      ],
+      "parameters": {
+        "resource": "customer",
+        "operation": "create",
+        "displayName": "={{ ($('New order').item.json.data.billingAddress?.company || ($('New order').item.json.data.customer.firstName + ' ' + $('New order').item.json.data.customer.lastName)).trim() }} ({{ $('New order').item.json.data.customer.email }})",
+        "additionalFields": {
+          "GivenName": "={{ $('New order').item.json.data.customer.firstName }}",
+          "FamilyName": "={{ $('New order').item.json.data.customer.lastName }}",
+          "PrimaryEmailAddr": "={{ $('New order').item.json.data.customer.email }}",
+          "CompanyName": "={{ $('New order').item.json.data.billingAddress?.company || '' }}",
+          "PrimaryPhone": "={{ $('New order').item.json.data.billingAddress?.phoneNumber || '' }}"
+        }
+      }
+    },
+    {
+      "id": "6bdbcc43-ce1c-4ee2-a465-2a8f9ec33c95",
+      "name": "Create invoice",
+      "type": "n8n-nodes-base.quickbooks",
+      "typeVersion": 1,
+      "position": [
+        960,
+        0
+      ],
+      "parameters": {
+        "resource": "invoice",
+        "operation": "create",
+        "CustomerRef": "={{ $json.Id }}",
+        "Line": "={{ [ ...$('New order').item.json.data.items.map(i => ({ DetailType: 'SalesItemLineDetail', itemId: '1', Qty: i.quantity, Amount: i.priceExclTax, Description: (i.sku ? i.sku + ' ' : '') + i.name + (i.attributes ? ' (' + i.attributes.replace(/\\n/g, ', ') + ')' : '') })), ...($('New order').item.json.data.totals.shippingExclTax > 0 ? [{ DetailType: 'SalesItemLineDetail', itemId: 'SHIPPING_ITEM_ID', Amount: $('New order').item.json.data.totals.shippingExclTax, Description: 'Shipping: ' + ($('New order').item.json.data.shippingMethod || '') }] : []) ] }}",
+        "additionalFields": {
+          "DocNumber": "={{ 'NOP-' + $('New order').item.json.data.number }}",
+          "TxnDate": "={{ $('New order').item.json.data.createdOnUtc }}",
+          "BillEmail": "={{ $('New order').item.json.data.customer.email }}",
+          "CustomerMemo": "={{ 'nopCommerce order ' + $('New order').item.json.data.number }}"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "New order": {
+      "main": [
+        [
+          {
+            "node": "Find customer",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Find customer": {
+      "main": [
+        [
+          {
+            "node": "Customer exists?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Customer exists?": {
+      "main": [
+        [
+          {
+            "node": "Create invoice",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Create customer",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create customer": {
+      "main": [
+        [
+          {
+            "node": "Create invoice",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "tags": []
+}

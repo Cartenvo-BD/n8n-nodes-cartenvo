@@ -1,0 +1,83 @@
+{
+  "name": "nopCommerce: new order or failed payment → Slack message",
+  "meta": {
+    "templateCredsSetupCompleted": false,
+    "description": "Posts to Slack when an order is placed, and warns when an order is cancelled or its payment is voided."
+  },
+  "nodes": [
+    {
+      "id": "aa7684e4-bc81-4862-a890-2cf56fea47bd",
+      "name": "Setup",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -460,
+        -80
+      ],
+      "parameters": {
+        "content": "## Orders → Slack\n\n1. **Order events:** choose your Cartenvo Integration Hub credential (scope `webhooks:manage`).\n2. **Post to Slack:** choose your Slack credential and the channel.\n3. Activate.\n\nIt posts new orders (marked when payment is still pending), cancellations, voided payments and failed payments. `order.payment_failed` needs Integration Hub release 5: it's sent when a recurring payment fails, and, if you set the hours under **Settings → Failed payments**, when an order is still unpaid.",
+        "height": 340,
+        "width": 420
+      }
+    },
+    {
+      "id": "ac538487-faad-4650-a18b-2c8bf146f19e",
+      "name": "Order events",
+      "type": "n8n-nodes-cartenvo.cartenvoTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {
+        "events": [
+          "order.placed",
+          "order.cancelled",
+          "order.voided",
+          "order.payment_failed"
+        ],
+        "format": "full",
+        "options": {}
+      },
+      "webhookId": "003874dd-70ea-41d3-a54d-911bcb36e600"
+    },
+    {
+      "id": "73be9dcc-e3d6-4143-a2d1-fefd8745d85e",
+      "name": "Post to Slack",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.7,
+      "position": [
+        260,
+        0
+      ],
+      "parameters": {
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "mode": "name",
+          "value": "#orders"
+        },
+        "text": "={{ { 'order.placed': ($json.data.paymentStatus === 'Pending' ? ':hourglass: New order, payment pending: ' : ':shopping_trolley: New order ') , 'order.cancelled': ':x: Order cancelled: ', 'order.voided': ':warning: Payment voided: ', 'order.payment_failed': ':rotating_light: Payment failed: ' }[$json.type] }}{{ $json.data.number }}, {{ $json.data.totals.total }} {{ $json.data.currency }} from {{ $json.data.customer.firstName }} {{ $json.data.customer.lastName }} ({{ $json.data.customer.email }}), {{ $json.data.items.length }} items, {{ $json.data.paymentMethod }}. {{ $json.data.adminUrl }}",
+        "otherOptions": {}
+      }
+    }
+  ],
+  "connections": {
+    "Order events": {
+      "main": [
+        [
+          {
+            "node": "Post to Slack",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "tags": []
+}

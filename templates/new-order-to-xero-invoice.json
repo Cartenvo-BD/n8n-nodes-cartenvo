@@ -1,0 +1,203 @@
+{
+  "name": "nopCommerce: new order → Xero invoice",
+  "meta": {
+    "templateCredsSetupCompleted": false,
+    "description": "Creates a draft Xero sales invoice for each new nopCommerce order, and the contact when they are new."
+  },
+  "nodes": [
+    {
+      "id": "8e5305fc-4b30-4216-a74c-764282fc7872",
+      "name": "Setup",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -460,
+        -80
+      ],
+      "parameters": {
+        "content": "## New order → Xero invoice\n\n1. **New order:** choose your Cartenvo Integration Hub credential (scope `webhooks:manage`).\n2. **Xero nodes:** choose your Xero credential and organisation.\n3. **Create invoice:** `200` is the sales account code of Xero's default chart of accounts. Change it if yours differs.\n4. Activate. Invoices are made as drafts; change **Status** to `AUTHORISED` when you trust the flow.\n\nUnit prices exclude tax (Line Amount Type: Exclusive). Xero applies the account's tax rate.",
+        "height": 340,
+        "width": 420
+      }
+    },
+    {
+      "id": "185364fd-7c9a-42e4-a800-290414cd29b2",
+      "name": "New order",
+      "type": "n8n-nodes-cartenvo.cartenvoTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {
+        "events": [
+          "order.placed"
+        ],
+        "format": "full",
+        "options": {}
+      },
+      "webhookId": "83876827-6153-407a-a3f3-f107cf2977c6"
+    },
+    {
+      "id": "3263f433-1034-4bc9-a010-aa2697db7d9e",
+      "name": "Find contact",
+      "type": "n8n-nodes-base.xero",
+      "typeVersion": 1,
+      "position": [
+        240,
+        0
+      ],
+      "alwaysOutputData": true,
+      "parameters": {
+        "resource": "contact",
+        "operation": "getAll",
+        "organizationId": "",
+        "limit": 1,
+        "options": {
+          "where": "=EmailAddress==\"{{ $json.data.customer.email.replace(/\"/g, '') }}\""
+        }
+      }
+    },
+    {
+      "id": "bc22abca-e887-4637-ae0f-b5cdcae5d96e",
+      "name": "Contact exists?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        480,
+        0
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "6216c528-6db1-432f-ae62-be45ae4378bc",
+              "leftValue": "={{ $json.ContactID }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "exists",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "784497e6-9511-40ab-a1a7-1b70772d065e",
+      "name": "Create contact",
+      "type": "n8n-nodes-base.xero",
+      "typeVersion": 1,
+      "position": [
+        720,
+        120
+      ],
+      "parameters": {
+        "resource": "contact",
+        "operation": "create",
+        "organizationId": "",
+        "name": "={{ ($('New order').item.json.data.billingAddress?.company || ($('New order').item.json.data.customer.firstName + ' ' + $('New order').item.json.data.customer.lastName)).trim() }} ({{ $('New order').item.json.data.customer.email }})",
+        "additionalFields": {
+          "emailAddress": "={{ $('New order').item.json.data.customer.email }}",
+          "firstName": "={{ $('New order').item.json.data.customer.firstName }}",
+          "lastName": "={{ $('New order').item.json.data.customer.lastName }}",
+          "taxNumber": "={{ $('New order').item.json.data.vatNumber || '' }}"
+        }
+      }
+    },
+    {
+      "id": "74682d3d-4ba0-4efc-af5a-f7ef99a21388",
+      "name": "Create invoice",
+      "type": "n8n-nodes-base.xero",
+      "typeVersion": 1,
+      "position": [
+        960,
+        0
+      ],
+      "parameters": {
+        "resource": "invoice",
+        "operation": "create",
+        "organizationId": "",
+        "type": "ACCREC",
+        "contactId": "={{ $json.ContactID }}",
+        "lineItemsUi": {
+          "lineItemsValues": "={{ [ ...$('New order').item.json.data.items.map(i => ({ description: (i.sku ? i.sku + ' ' : '') + i.name, quantity: i.quantity, unitAmount: String(i.unitPriceExclTax), accountCode: '200' })), ...($('New order').item.json.data.totals.shippingExclTax > 0 ? [{ description: 'Shipping: ' + ($('New order').item.json.data.shippingMethod || ''), quantity: 1, unitAmount: String($('New order').item.json.data.totals.shippingExclTax), accountCode: '200' }] : []) ] }}"
+        },
+        "additionalFields": {
+          "reference": "={{ 'nopCommerce order ' + $('New order').item.json.data.number }}",
+          "date": "={{ $('New order').item.json.data.createdOnUtc }}",
+          "currency": "={{ $('New order').item.json.data.currency }}",
+          "lineAmountType": "Exclusive",
+          "status": "DRAFT"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "New order": {
+      "main": [
+        [
+          {
+            "node": "Find contact",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Find contact": {
+      "main": [
+        [
+          {
+            "node": "Contact exists?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Contact exists?": {
+      "main": [
+        [
+          {
+            "node": "Create invoice",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Create contact",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create contact": {
+      "main": [
+        [
+          {
+            "node": "Create invoice",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "tags": []
+}

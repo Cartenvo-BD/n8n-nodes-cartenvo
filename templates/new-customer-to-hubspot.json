@@ -1,0 +1,87 @@
+{
+  "name": "nopCommerce: new customer → HubSpot contact",
+  "meta": {
+    "templateCredsSetupCompleted": false,
+    "description": "Creates or updates a HubSpot contact when a customer registers in the nopCommerce store."
+  },
+  "nodes": [
+    {
+      "id": "fcf252ca-2b5c-43f9-a712-06ec154e53a2",
+      "name": "Setup",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -460,
+        -80
+      ],
+      "parameters": {
+        "content": "## New customer → HubSpot\n\n1. **New customer:** choose your Cartenvo Integration Hub credential (scope `webhooks:manage`).\n2. **Create or update contact:** choose your HubSpot credential (a private app token with the contacts scopes).\n3. Activate. A contact with the same email is updated, not doubled.\n\nAdd `customer.updated` to the events to keep details in step.",
+        "height": 300,
+        "width": 420
+      }
+    },
+    {
+      "id": "c895743a-7058-448f-a4e8-fbf9ca315ba7",
+      "name": "New customer",
+      "type": "n8n-nodes-cartenvo.cartenvoTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {
+        "events": [
+          "customer.registered"
+        ],
+        "format": "full",
+        "options": {}
+      },
+      "webhookId": "f135fb38-02d0-4b8a-a35a-ea98176beb7f"
+    },
+    {
+      "id": "e24b0ac0-ecbc-4315-a8db-0e20ccc2ccae",
+      "name": "Create or update contact",
+      "type": "n8n-nodes-base.hubspot",
+      "typeVersion": 2.1,
+      "position": [
+        260,
+        0
+      ],
+      "parameters": {
+        "authentication": "appToken",
+        "resource": "contact",
+        "operation": "upsert",
+        "email": "={{ $json.data.email }}",
+        "additionalFields": {
+          "firstName": "={{ $json.data.firstName || \"\" }}",
+          "lastName": "={{ $json.data.lastName || \"\" }}",
+          "companyName": "={{ $json.data.company || $json.data.billingAddress?.company || \"\" }}",
+          "phoneNumber": "={{ $json.data.phone || $json.data.billingAddress?.phoneNumber || \"\" }}",
+          "streetAddress": "={{ $json.data.billingAddress?.address1 || \"\" }}",
+          "city": "={{ $json.data.billingAddress?.city || \"\" }}",
+          "postalCode": "={{ $json.data.billingAddress?.zipPostalCode || \"\" }}",
+          "country": "={{ $json.data.billingAddress?.countryCode || \"\" }}"
+        },
+        "options": {}
+      }
+    }
+  ],
+  "connections": {
+    "New customer": {
+      "main": [
+        [
+          {
+            "node": "Create or update contact",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "tags": []
+}

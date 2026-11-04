@@ -36,7 +36,8 @@ marketplace).
    |---|---|
    | The trigger | `webhooks:manage` |
    | Get and Get Many orders | `orders:read` |
-   | Update Status, Add Shipment | `orders:write` |
+   | Update Status, Add Shipment, Add Note | `orders:write` |
+   | Set External Reference | `references:write` |
    | Update Stock | `stock:write` |
    | Update Price | `prices:write` |
 
@@ -80,11 +81,14 @@ address.
 | Resource | Operation | What it does |
 |---|---|---|
 | Order | **Get** | One order with its items, addresses, totals and external references |
-| Order | **Get Many** | Orders oldest first, filtered by status, payment or shipping status, dates, or an ERP number |
+| Order | **Get Many** | Orders oldest or newest first, filtered by order number, status, payment or shipping status, dates, or an ERP number |
 | Order | **Update Status** | Order status (Pending, Processing, Complete, Cancelled) and payment status (Paid, Refunded, Voided), through nopCommerce's own rules and emails |
 | Order | **Add Shipment** | Some items (by SKU or order item) or everything left, with a tracking number, shipped and delivered at once if you like |
+| Order | **Add Note** | A note on the order, for staff, or shown to the customer and emailed to them |
+| Order | **Set External Reference** | The order's number in another system (such as `odoo` → `SO0042`), found again with Get Many; empty removes it |
 | Product | **Update Stock** | Set or adjust stock by SKU or product ID, per warehouse and attribute combination, kept in stock history |
 | Product | **Update Price** | Set price, old price and cost by SKU or product ID |
+| Product | **Set External Reference** | The product's code in another system; empty removes it |
 
 - **Stock and prices are sent in bulk:** each input item is one line, and up to 1,000 lines go in one call. Each
   output item says what happened to its line (`updated`, `unchanged` or `failed`, with old and new values).

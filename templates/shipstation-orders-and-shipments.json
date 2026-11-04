@@ -1,0 +1,293 @@
+{
+  "name": "nopCommerce ↔ ShipStation: paid orders out, shipments back",
+  "meta": {
+    "templateCredsSetupCompleted": false,
+    "description": "Sends paid nopCommerce orders to ShipStation, and adds the shipment with its tracking number to the order when ShipStation ships it."
+  },
+  "nodes": [
+    {
+      "id": "d0ea3b8d-5d45-4a91-a16d-fcf0ee15516c",
+      "name": "Setup",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -500,
+        -160
+      ],
+      "parameters": {
+        "content": "## nopCommerce ↔ ShipStation\n\n**Credentials**\n- Cartenvo Integration Hub: a key with `webhooks:manage` and `orders:write`.\n- ShipStation: an **HTTP Basic Auth** credential with your ShipStation API key as user and API secret as password (ShipStation → Settings → Account → API Settings). Use it in both HTTP nodes.\n\n**Orders out:** paid orders that need shipping go to ShipStation as *awaiting shipment*. The order key is `nop-` + the nopCommerce order ID.\n\n**Shipments back:**\n1. Activate the workflow and copy the production URL of **ShipStation shipped**.\n2. In ShipStation, open Settings → Integrations → Webhooks, add a webhook for **On Orders Shipped (SHIP_NOTIFY)** with that URL.\n3. Each shipment is added to its order with the tracking number, marked as shipped, and the customer gets nopCommerce's email.\n\nItems are matched by SKU, so every product needs one.",
+        "height": 520,
+        "width": 460
+      }
+    },
+    {
+      "id": "230516da-711c-47a3-a5a4-6768e7062ac4",
+      "name": "Order paid",
+      "type": "n8n-nodes-cartenvo.cartenvoTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {
+        "events": [
+          "order.paid"
+        ],
+        "format": "full",
+        "options": {}
+      },
+      "webhookId": "570a39e1-9cdb-42ae-a47b-b3fac81a2f0e"
+    },
+    {
+      "id": "e6280351-6a36-4209-a7c8-c962e2ce98a2",
+      "name": "Needs shipping?",
+      "type": "n8n-nodes-base.filter",
+      "typeVersion": 2.2,
+      "position": [
+        240,
+        0
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "9fb5c6ad-8afa-4f5d-a790-3709e4f6f147",
+              "leftValue": "={{ $json.data.shippingStatus }}",
+              "rightValue": "ShippingNotRequired",
+              "operator": {
+                "type": "string",
+                "operation": "notEquals"
+              }
+            },
+            {
+              "id": "82cdba0d-633c-48d9-a954-55f3e7a45a6a",
+              "leftValue": "={{ $json.data.pickupInStore }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "false",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "478f0424-acbe-4136-a154-0f354c1a46fc",
+      "name": "Create ShipStation order",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        480,
+        0
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "https://ssapi.shipstation.com/orders/createorder",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBasicAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ orderNumber: $json.data.number, orderKey: 'nop-' + $json.data.id, orderDate: $json.data.createdOnUtc, paymentDate: $json.data.paidOnUtc, orderStatus: 'awaiting_shipment', customerEmail: $json.data.customer.email, customerUsername: $json.data.customer.email, billTo: { name: ($json.data.billingAddress.firstName + ' ' + $json.data.billingAddress.lastName).trim(), company: $json.data.billingAddress.company, street1: $json.data.billingAddress.address1, street2: $json.data.billingAddress.address2, city: $json.data.billingAddress.city, state: $json.data.billingAddress.stateCode || $json.data.billingAddress.stateName, postalCode: $json.data.billingAddress.zipPostalCode, country: $json.data.billingAddress.countryCode, phone: $json.data.billingAddress.phoneNumber }, shipTo: { name: (($json.data.shippingAddress || $json.data.billingAddress).firstName + ' ' + ($json.data.shippingAddress || $json.data.billingAddress).lastName).trim(), company: ($json.data.shippingAddress || $json.data.billingAddress).company, street1: ($json.data.shippingAddress || $json.data.billingAddress).address1, street2: ($json.data.shippingAddress || $json.data.billingAddress).address2, city: ($json.data.shippingAddress || $json.data.billingAddress).city, state: ($json.data.shippingAddress || $json.data.billingAddress).stateCode || ($json.data.shippingAddress || $json.data.billingAddress).stateName, postalCode: ($json.data.shippingAddress || $json.data.billingAddress).zipPostalCode, country: ($json.data.shippingAddress || $json.data.billingAddress).countryCode, phone: ($json.data.shippingAddress || $json.data.billingAddress).phoneNumber }, items: $json.data.items.map(i => ({ lineItemKey: String(i.id), sku: i.sku, name: i.name, quantity: i.quantity, unitPrice: i.unitPriceInclTax, weight: i.itemWeight ? { value: i.itemWeight, units: 'kilograms' } : undefined, options: (i.attributes || '').split('\\n').filter(Boolean).map(a => ({ name: a.split(':')[0].trim(), value: a.split(':').slice(1).join(':').trim() })) })), amountPaid: $json.data.totals.total, taxAmount: $json.data.totals.tax, shippingAmount: $json.data.totals.shippingInclTax, requestedShippingService: $json.data.shippingMethod, advancedOptions: { source: 'nopCommerce' } }) }}",
+        "options": {}
+      }
+    },
+    {
+      "id": "30b3e70c-2d49-4705-ac43-022d27be78a7",
+      "name": "ShipStation shipped",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        320
+      ],
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "shipstation-ship-notify",
+        "responseMode": "onReceived",
+        "options": {}
+      },
+      "webhookId": "878f3ca2-3d4d-45f4-a1a0-e577b2dd2806"
+    },
+    {
+      "id": "a78119a6-95ac-4f28-a078-2d9abe0ccc6c",
+      "name": "Get shipments",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        240,
+        320
+      ],
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $json.body.resource_url.replace(/includeShipmentItems=False/i, 'includeShipmentItems=True') }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBasicAuth",
+        "options": {}
+      }
+    },
+    {
+      "id": "e309c768-3a42-44ba-a7bb-2036e53f00bb",
+      "name": "One item per shipment",
+      "type": "n8n-nodes-base.splitOut",
+      "typeVersion": 1,
+      "position": [
+        480,
+        320
+      ],
+      "parameters": {
+        "fieldToSplitOut": "shipments",
+        "options": {}
+      }
+    },
+    {
+      "id": "63c70aab-bc09-4389-ab96-a02292117c8d",
+      "name": "From nopCommerce?",
+      "type": "n8n-nodes-base.filter",
+      "typeVersion": 2.2,
+      "position": [
+        720,
+        320
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "494e7c03-82b0-4b53-a2dc-1216362b3cbc",
+              "leftValue": "={{ $json.orderKey }}",
+              "rightValue": "nop-",
+              "operator": {
+                "type": "string",
+                "operation": "startsWith"
+              }
+            },
+            {
+              "id": "207b5471-f3c7-496e-aeb9-752c9c917eba",
+              "leftValue": "={{ $json.voided }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "false",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "ca3f0303-b3b2-46ce-ad97-eb16d0125234",
+      "name": "Add shipment",
+      "type": "n8n-nodes-cartenvo.cartenvo",
+      "typeVersion": 1,
+      "position": [
+        960,
+        320
+      ],
+      "parameters": {
+        "resource": "order",
+        "operation": "addShipment",
+        "orderId": "={{ Number($json.orderKey.replace('nop-', '')) }}",
+        "items": {
+          "item": "={{ ($json.shipmentItems || []).filter(i => i.sku).map(i => ({ sku: i.sku, quantity: i.quantity })) }}"
+        },
+        "trackingNumber": "={{ $json.trackingNumber }}",
+        "ship": true,
+        "notifyCustomer": true,
+        "shipmentOptions": {
+          "adminComment": "={{ 'ShipStation shipment ' + $json.shipmentId + ' (' + $json.carrierCode + ', ' + $json.serviceCode + ')' }}"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Order paid": {
+      "main": [
+        [
+          {
+            "node": "Needs shipping?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Needs shipping?": {
+      "main": [
+        [
+          {
+            "node": "Create ShipStation order",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "ShipStation shipped": {
+      "main": [
+        [
+          {
+            "node": "Get shipments",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get shipments": {
+      "main": [
+        [
+          {
+            "node": "One item per shipment",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "One item per shipment": {
+      "main": [
+        [
+          {
+            "node": "From nopCommerce?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "From nopCommerce?": {
+      "main": [
+        [
+          {
+            "node": "Add shipment",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "tags": []
+}

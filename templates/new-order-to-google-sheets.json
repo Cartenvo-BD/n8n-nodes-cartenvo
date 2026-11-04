@@ -1,0 +1,243 @@
+{
+  "name": "nopCommerce: new order → Google Sheets row",
+  "meta": {
+    "templateCredsSetupCompleted": false,
+    "description": "Adds a row to a Google Sheet for each new nopCommerce order, with customer, items and totals."
+  },
+  "nodes": [
+    {
+      "id": "0c702d58-c8d6-461d-a98d-c50c8bf36e6a",
+      "name": "Setup",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -460,
+        -80
+      ],
+      "parameters": {
+        "content": "## New order → Google Sheets\n\n1. Make a sheet whose first row has these headers: Order, Order ID, Date, Customer, Email, Country, Status, Payment, Items, Subtotal, Shipping, Tax, Total, Currency, Admin link.\n2. **New order:** choose your Cartenvo Integration Hub credential (scope `webhooks:manage`).\n3. **Add row:** choose your Google credential, the spreadsheet and the sheet.\n4. Activate.",
+        "height": 300,
+        "width": 420
+      }
+    },
+    {
+      "id": "5611119a-8b19-4ed0-abad-cad62799eed2",
+      "name": "New order",
+      "type": "n8n-nodes-cartenvo.cartenvoTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {
+        "events": [
+          "order.placed"
+        ],
+        "format": "full",
+        "options": {}
+      },
+      "webhookId": "0d8dd9a0-c6a5-490b-a86e-f97eaa9a7fbe"
+    },
+    {
+      "id": "3a6dad89-acbd-4188-abfe-d76e5a10c8d8",
+      "name": "Add row",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        260,
+        0
+      ],
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "mode": "url",
+          "value": ""
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "list",
+          "value": "gid=0",
+          "cachedResultName": "Sheet1"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Order": "={{ $json.data.number }}",
+            "Order ID": "={{ $json.data.id }}",
+            "Date": "={{ $json.data.createdOnUtc }}",
+            "Customer": "={{ $json.data.customer.firstName }} {{ $json.data.customer.lastName }}",
+            "Email": "={{ $json.data.customer.email }}",
+            "Country": "={{ $json.data.shippingAddress?.countryCode || $json.data.billingAddress?.countryCode || \"\" }}",
+            "Status": "={{ $json.data.status }}",
+            "Payment": "={{ $json.data.paymentStatus }}",
+            "Items": "={{ $json.data.items.map(i => i.quantity + ' x ' + (i.sku || i.name)).join(', ') }}",
+            "Subtotal": "={{ $json.data.totals.subtotalExclTax }}",
+            "Shipping": "={{ $json.data.totals.shippingExclTax }}",
+            "Tax": "={{ $json.data.totals.tax }}",
+            "Total": "={{ $json.data.totals.total }}",
+            "Currency": "={{ $json.data.currency }}",
+            "Admin link": "={{ $json.data.adminUrl }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "Order",
+              "displayName": "Order",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Order ID",
+              "displayName": "Order ID",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Date",
+              "displayName": "Date",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Customer",
+              "displayName": "Customer",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Email",
+              "displayName": "Email",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Country",
+              "displayName": "Country",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Status",
+              "displayName": "Status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Payment",
+              "displayName": "Payment",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Items",
+              "displayName": "Items",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Subtotal",
+              "displayName": "Subtotal",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Shipping",
+              "displayName": "Shipping",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Tax",
+              "displayName": "Tax",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Total",
+              "displayName": "Total",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Currency",
+              "displayName": "Currency",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Admin link",
+              "displayName": "Admin link",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ]
+        },
+        "options": {}
+      }
+    }
+  ],
+  "connections": {
+    "New order": {
+      "main": [
+        [
+          {
+            "node": "Add row",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "tags": []
+}
